@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import requests
 from pathlib import Path
 import pandas as pd
 import plotly.express as px
+import joblib
+import numpy as np
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
@@ -23,7 +24,30 @@ MODEL_DIR = BASE_DIR / "models"
 OUTPUT_DIR = BASE_DIR / "outputs"
 
 df = pd.read_csv(OUTPUT_DIR / "segmented_customers.csv")
-API_URL = "http://127.0.0.1:8000"
+
+# Load trained models
+kmeans = joblib.load(MODEL_DIR / "clustering_model.pkl")
+scaler = joblib.load(MODEL_DIR / "scaler.pkl")
+pca = joblib.load(MODEL_DIR / "pca.pkl")
+feature_columns = joblib.load(MODEL_DIR / "feature_columns.pkl")
+
+# Segment names
+segment_names = {
+    0: "High Value Loyal",
+    1: "Frequent Buyer",
+    2: "Occasional Customer",
+    3: "At Risk"
+}
+
+# Business recommendations
+recommendations = {
+    "High Value Loyal": "Offer VIP rewards and premium recommendations.",
+    "Frequent Buyer": "Cross-sell complementary products.",
+    "Occasional Customer": "Send loyalty offers and reminders.",
+    "At Risk": "Launch re-engagement campaigns."
+}
+
+
 # ---------------- CSS ----------------
 
 st.markdown("""
@@ -334,65 +358,51 @@ elif page == "Predict Segment":
 
     if st.button("Predict Segment"):
 
-        payload = {
+    # Create input dataframe
+        input_df = pd.DataFrame([{
             "Recency": recency,
             "Frequency": frequency,
             "Monetary": monetary,
             "AvgOrderValue": avg_order,
             "TotalQuantity": quantity,
             "Country": country
-        }
+        }])
 
         try:
+            # Scale features
+            X = scaler.transform(input_df[feature_columns])
 
-            response = requests.post(
-                f"{API_URL}/segment",
-                json=payload
-            )
+            # Apply PCA
+            X_pca = pca.transform(X)
 
-            if response.status_code == 200:
+            # Predict cluster
+            cluster = int(kmeans.predict(X_pca)[0])
 
-                result = response.json()
+            # Distance from centroid
+            distance = float(np.min(kmeans.transform(X_pca)))
 
-                st.success("Prediction completed successfully!")
+            # Segment name
+            segment = segment_names.get(cluster, "Unknown")
 
-                col1, col2, col3 = st.columns(3)
+            st.success("Prediction completed successfully!")
 
-                with col1:
-                    st.metric(
-                        "Cluster",
-                        result["cluster"]
-                    )
+            col1, col2, col3 = st.columns(3)
 
-                with col2:
-                    st.metric(
-                        "Segment",
-                        result["segment_name"]
-                    )
+            with col1:
+                st.metric("Cluster", cluster)
 
-                with col3:
-                    st.metric(
-                        "Distance",
-                        result["distance_from_centroid"]
-                    )
+            with col2:
+                st.metric("Segment", segment)
 
-                st.subheader("Business Recommendation")
+            with col3:
+                st.metric("Distance", round(distance, 2))
 
-                st.info(
-                    result["recommendation"]
-                )
-
-            else:
-
-                st.error(
-                    f"Prediction failed: {response.text}"
-                )
+            st.subheader("Business Recommendation")
+            st.info(recommendations.get(segment, "No recommendation available."))
 
         except Exception as e:
-
-            st.error(
-                f"Could not connect to backend: {e}"
-            )
+            st.error(f"Prediction failed: {e}")
+    
 
 # ==========================================================
 # PCA VISUALIZATION
