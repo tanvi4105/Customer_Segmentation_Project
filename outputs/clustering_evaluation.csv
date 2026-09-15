@@ -1,0 +1,4 @@
+Algorithm,Clusters,Silhouette Score,Davies-Bouldin,Calinski-Harabasz
+K-Means,4,0.518,0.682,3764.29
+DBSCAN,2,0.721,0.256,185.79
+Agglomerative,4,0.51,0.541,3246.46
