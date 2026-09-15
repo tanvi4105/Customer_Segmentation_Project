@@ -1,10 +1,11 @@
 streamlit
 pandas
 numpy
+plotly
+plotly-express
+requests
 scikit-learn
 joblib
-plotly
-requests
 fastapi
 uvicorn
 python-multipart
