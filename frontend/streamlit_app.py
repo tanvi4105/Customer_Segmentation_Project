@@ -20,7 +20,7 @@ MODEL_DIR = BASE_DIR / "models"
 OUTPUT_DIR = BASE_DIR / "outputs"
 
 # FastAPI URL
-API_URL = "http://127.0.0.1:8000"   # Local testing
+API_URL = "https://customer-segmentation-project-zwhg.onrender.com"   # Local testing
 # After deployment replace with your Render URL
 
 df = pd.read_csv(OUTPUT_DIR / "segmented_customers.csv")
