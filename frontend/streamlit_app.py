@@ -3,10 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
-import pandas as pd
-import plotly.express as px
-import joblib
-import numpy as np
+import requests
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
@@ -17,38 +14,17 @@ st.set_page_config(
 )
 
 # ---------------- LOAD DATA ----------------
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 MODEL_DIR = BASE_DIR / "models"
 OUTPUT_DIR = BASE_DIR / "outputs"
 
+# FastAPI URL
+API_URL = "http://127.0.0.1:8000"   # Local testing
+# After deployment replace with your Render URL
+
 df = pd.read_csv(OUTPUT_DIR / "segmented_customers.csv")
 
-# Load trained models
-kmeans = joblib.load(MODEL_DIR / "clustering_model.pkl")
-scaler = joblib.load(MODEL_DIR / "scaler.pkl")
-pca = joblib.load(MODEL_DIR / "pca.pkl")
-feature_columns = joblib.load(MODEL_DIR / "feature_columns.pkl")
-
-# Segment names
-segment_names = {
-    0: "High Value Loyal",
-    1: "Frequent Buyer",
-    2: "Occasional Customer",
-    3: "At Risk"
-}
-
-# Business recommendations
-recommendations = {
-    "High Value Loyal": "Offer VIP rewards and premium recommendations.",
-    "Frequent Buyer": "Cross-sell complementary products.",
-    "Occasional Customer": "Send loyalty offers and reminders.",
-    "At Risk": "Launch re-engagement campaigns."
-}
-
-
-# ---------------- CSS ----------------
 
 st.markdown("""
 <style>
@@ -358,51 +334,43 @@ elif page == "Predict Segment":
 
     if st.button("Predict Segment"):
 
-    # Create input dataframe
-        input_df = pd.DataFrame([{
+        payload = {
             "Recency": recency,
             "Frequency": frequency,
             "Monetary": monetary,
             "AvgOrderValue": avg_order,
             "TotalQuantity": quantity,
             "Country": country
-        }])
+        }
 
         try:
-            # Scale features
-            X = scaler.transform(input_df[feature_columns])
 
-            # Apply PCA
-            X_pca = pca.transform(X)
+            response = requests.post(
+                f"{API_URL}/segment",
+                json=payload,
+                timeout=10
+            )
 
-            # Predict cluster
-            cluster = int(kmeans.predict(X_pca)[0])
+            if response.status_code == 200:
 
-            # Distance from centroid
-            distance = float(np.min(kmeans.transform(X_pca)))
+                result = response.json()
 
-            # Segment name
-            segment = segment_names.get(cluster, "Unknown")
+                st.success("Prediction completed successfully!")
 
-            st.success("Prediction completed successfully!")
+                col1, col2, col3 = st.columns(3)
 
-            col1, col2, col3 = st.columns(3)
+                col1.metric("Cluster", result["cluster"])
+                col2.metric("Segment", result["segment_name"])
+                col3.metric("Distance", result["distance_from_centroid"])
 
-            with col1:
-                st.metric("Cluster", cluster)
+                st.subheader("Business Recommendation")
+                st.info(result["recommendation"])
 
-            with col2:
-                st.metric("Segment", segment)
-
-            with col3:
-                st.metric("Distance", round(distance, 2))
-
-            st.subheader("Business Recommendation")
-            st.info(recommendations.get(segment, "No recommendation available."))
+            else:
+                st.error(response.text)
 
         except Exception as e:
-            st.error(f"Prediction failed: {e}")
-    
+            st.error(f"Could not connect to backend: {e}")
 
 # ==========================================================
 # PCA VISUALIZATION
@@ -438,190 +406,6 @@ elif page=="Cluster Visualization":
 
     st.plotly_chart(fig,use_container_width=True)
  
-# elif page == "Predict Segment":
-
-#     st.title("🎯 Predict Customer Segment")
-#     st.write("Enter customer information to identify the customer segment.")
-
-#     st.markdown("""
-#     <style>
-#     .predict-card {
-#         background: #1b2942;
-#         padding: 25px;
-#         border-radius: 18px;
-#         border: 1px solid rgba(255,255,255,0.08);
-#         margin-bottom: 20px;
-#     }
-
-#     .result-card {
-#         background: #16243b;
-#         padding: 25px;
-#         border-radius: 18px;
-#         border: 1px solid rgba(255,255,255,0.08);
-#         margin-top: 20px;
-#     }
-
-#     div.stButton > button {
-#         width: 180px;
-#         height: 45px;
-#         font-size: 16px;
-#         font-weight: bold;
-#     }
-#     </style>
-#     """, unsafe_allow_html=True)
-
-#     st.markdown(
-#         '<div class="predict-card">',
-#         unsafe_allow_html=True
-#     )
-
-#     col1, col2 = st.columns(2)
-
-#     with col1:
-
-#         recency = st.number_input(
-#             "Recency",
-#             min_value=0.0,
-#             value=30.0,
-#             step=1.0,
-#             help="Number of days since the customer's last purchase."
-#         )
-
-#         frequency = st.number_input(
-#             "Frequency",
-#             min_value=0.0,
-#             value=5.0,
-#             step=1.0,
-#             help="Number of purchases/orders made by the customer."
-#         )
-
-#         monetary = st.number_input(
-#             "Monetary",
-#             min_value=0.0,
-#             value=500.0,
-#             step=50.0,
-#             help="Total amount spent by the customer."
-#         )
-
-#     with col2:
-
-#         avg_order = st.number_input(
-#             "Average Order Value",
-#             min_value=0.0,
-#             value=100.0,
-#             step=10.0,
-#             help="Average amount spent per order."
-#         )
-
-#         quantity = st.number_input(
-#             "Total Quantity",
-#             min_value=0.0,
-#             value=20.0,
-#             step=1.0,
-#             help="Total number of items purchased."
-#         )
-
-#         country = st.number_input(
-#             "Country Code",
-#             min_value=0.0,
-#             value=0.0,
-#             step=1.0,
-#             help="Numerical country encoding used during model training."
-#         )
-
-#     st.markdown('</div>', unsafe_allow_html=True)
-
-#     # Prediction button
-#     if st.button("🔍 Predict Segment"):
-
-#         payload = {
-#             "Recency": recency,
-#             "Frequency": frequency,
-#             "Monetary": monetary,
-#             "AvgOrderValue": avg_order,
-#             "TotalQuantity": quantity,
-#             "Country": country
-#         }
-
-#         try:
-
-#             response = requests.post(
-#                 f"{API_URL}/segment",
-#                 json=payload,
-#                 timeout=10
-#             )
-
-#             if response.status_code == 200:
-
-#                 result = response.json()
-
-#                 st.markdown(
-#                     '<div class="result-card">',
-#                     unsafe_allow_html=True
-#                 )
-
-#                 st.subheader("📌 Prediction Result")
-
-#                 result_col1, result_col2, result_col3 = st.columns(3)
-
-#                 with result_col1:
-#                     st.metric(
-#                         "Cluster",
-#                         result.get("cluster", "N/A")
-#                     )
-
-#                 with result_col2:
-#                     st.metric(
-#                         "Customer Segment",
-#                         result.get("segment_name", "Unknown")
-#                     )
-
-#                 with result_col3:
-#                     st.metric(
-#                         "Distance from Centroid",
-#                         result.get("distance_from_centroid", "N/A")
-#                     )
-
-#                 st.markdown("</div>", unsafe_allow_html=True)
-
-#                 st.markdown("### 💡 Business Recommendation")
-
-#                 st.info(
-#                     result.get(
-#                         "recommendation",
-#                         "No recommendation available."
-#                     )
-#                 )
-
-#             else:
-
-#                 st.error(
-#                     f"Prediction failed. Backend returned status code "
-#                     f"{response.status_code}"
-#                 )
-
-#                 try:
-#                     st.json(response.json())
-#                 except:
-#                     st.write(response.text)
-
-#         except requests.exceptions.ConnectionError:
-
-#             st.error(
-#                 "❌ Could not connect to backend. "
-#                 "Please make sure FastAPI is running on http://127.0.0.1:8000"
-#             )
-
-#         except requests.exceptions.Timeout:
-
-#             st.error(
-#                 "⏱️ Backend request timed out. "
-#                 "Please check whether the FastAPI server is running correctly."
-#             )
-
-#         except Exception as e:
-
-#             st.error(f"❌ Prediction error: {str(e)}")
 
 
 # ==========================================================
