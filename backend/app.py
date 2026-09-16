@@ -2,8 +2,8 @@ from fastapi import FastAPI, UploadFile, File
 import pandas as pd
 from pathlib import Path
 
-from predictor import predict_customer
-from schemas import CustomerInput
+from .predictor import predict_customer
+from .schemas import CustomerInput
 
 # ---------------- Paths ----------------
 BASE_DIR = Path(__file__).resolve().parent.parent
